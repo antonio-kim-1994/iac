@@ -1,0 +1,32 @@
+---
+- name: Update package manager on CentOS/Rocky Linux
+  yum:
+    name: '*'
+    state: latest
+  when: ansible_os_family == "RedHat"
+  notify:
+    - Update yum
+
+- name: Update DNF package manager
+  dnf:
+    name: '*'
+    state: latest
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version | int >= 8
+  notify:
+    - Update yum
+
+- name: Update APT package manager
+  apt:
+    update_cache: yes
+    upgrade: dist
+  when: ansible_os_family == "Debian"
+  notify:
+    - Upgrade apt
+
+- name: Install EPEL-release
+  yum:
+    name: epel-release
+    state: present
+  when: ansible_os_family == "RedHat"
+  notify:
+    - Check packages

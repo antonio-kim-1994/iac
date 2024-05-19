@@ -1,0 +1,6 @@
+[localVM]
+192.168.64.2
+192.168.64.3
+
+[servers:children]
+localVM

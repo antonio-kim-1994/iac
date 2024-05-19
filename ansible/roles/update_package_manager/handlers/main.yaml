@@ -1,0 +1,13 @@
+---
+# CentOS and Rockylinux
+- name: install epel-release on RedHat
+  yum:
+    name: epel-release
+    state: present
+  when: ansible_os_family == "RedHat" or ansible_distribution == "Rocky"
+
+# Debian
+- name: upgrade packages on Ubuntu
+  apt:
+    upgrade: dist
+  when: ansible_os_family == "Debian"

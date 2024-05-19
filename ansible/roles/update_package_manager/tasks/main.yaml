@@ -1,0 +1,21 @@
+---
+- name: Update package cache and upgrade all packages on CentOS
+  yum:
+    name: "*"
+    state: latest
+  when: ansible_os_family == "RedHat"
+  notify: install epel-release on RedHat
+
+- name: Update package cache and upgrade all packages on Rocky Linux
+  yum:
+    name: "*"
+    state: latest
+  when: ansible_distribution == "Rocky"
+  notify: install epel-release on RedHat
+
+- name: Update package cache on Ubuntu
+  apt:
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+  notify:
+    - upgrade packages on Ubuntu

@@ -1,0 +1,5 @@
+---
+# RHEL/Rocky Linux
+- name: Update Yum package manager
+  command: docker --version
+  register: docker_installed

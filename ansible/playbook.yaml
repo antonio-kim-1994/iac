@@ -1,0 +1,8 @@
+---
+- hosts: servers
+  remote_user: user
+  become: true
+  become_method: sudo
+  roles:
+    - update_package_manager
+#    - install_docker
