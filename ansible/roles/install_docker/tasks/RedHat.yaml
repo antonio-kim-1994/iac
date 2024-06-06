@@ -1,0 +1,39 @@
+---
+- name: Install prerequisites
+  yum:
+    name:
+      - yum-utils
+      - device-mapper-persistent-data
+      - lvm2
+    state: present
+
+- name: Add Docker repository
+  get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+
+- name: Install Docker
+  yum:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+  notify: Restart Docker
+
+- name: Ensure Docker service is enabled and started
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Add users to Docker group
+  user:
+    name: "{{ docker_user }}"
+    groups: ['docker']
+    append: yes
+  loop: "{{ docker_users }}"
+  loop_control:
+    loop_var: docker_user

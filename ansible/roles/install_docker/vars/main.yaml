@@ -1,0 +1,5 @@
+
+---
+# ../tasks/Debian.yaml 내 "Add users to Docker group" task 에서 사용
+docker_users:
+  - aijinet

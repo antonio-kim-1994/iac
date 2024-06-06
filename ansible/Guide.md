@@ -58,9 +58,6 @@
         three.example.com:
     ```
 
-
-[https://docs.ansible.com/ansible/latest/getting_started/index.html](https://docs.ansible.com/ansible/latest/getting_started/index.html)
-
 ### multiple group (parent/child group)
 
 - Inventory에서 Gorup 간 parent/child 관계를 구성해 관리할 수 있습니다.
@@ -184,3 +181,40 @@ test:
 
 4. Vault 파일 복호화  
    `ansible-vault decrypt secret.yaml`
+
+## Ansible Role
+- Ansible Role은 복잡한 작업을 모듈화하고 재사용 할 수 있도록 도와주는 기능입니다.
+- Role을 사용하면 프로젝트를 더 체계적으로 관리하기 쉽게 만들 수 있습니다.
+
+### 기본 구조
+```markdown
+roles/
+├── role_name/
+│   ├── tasks/
+│   │   └── main.yml
+│   ├── handlers/
+│   │   └── main.yml
+│   ├── files/
+│   ├── templates/
+│   ├── vars/
+│   │   └── main.yml
+│   ├── defaults/
+│   │   └── main.yml
+│   ├── meta/
+│   │   └── main.yml
+│   ├── library/
+│   └── module_utils/
+```
+
+- **tasks/**: Role에서 실행할 작업을 정의합니다. main.yml 파일이 주로 사용됩니다.
+- **handlers/**: 핸들러를 정의합니다. 핸들러는 특정 작업이 변경될 때 실행됩니다.
+- **files/**: 배포할 정적 파일을 저장합니다.
+- **templates/**: Jinja2 템플릿 파일을 저장합니다.
+- **vars/**: Role에서 사용할 변수들을 정의합니다.
+- **defaults/**: Role의 기본 변수들을 정의합니다.
+- **meta/**: Role에 대한 메타데이터를 정의합니다. 다른 Role에 대한 의존성을 지정할 수 있습니다.
+- **library/**: 사용자 정의 모듈을 저장합니다.
+- **module_utils/**: Role에서 사용하는 모듈 유틸리티를 저장합니다.
+
+# 참조
+- [Ansible 공식 문서](https://docs.ansible.com/ansible/latest/getting_started/index.html)

@@ -1,21 +1,21 @@
+# tasks/main.yml
 ---
-- name: Update package cache and upgrade all packages on CentOS
+
+- name: Update all packages on CentOS 7
   yum:
     name: "*"
     state: latest
-  when: ansible_os_family == "RedHat"
-  notify: install epel-release on RedHat
+  when: ansible_distribution == "CentOS" and ansible_distribution_major_version == "7"
 
-- name: Update package cache and upgrade all packages on Rocky Linux
+- name: Update all packages on Rocky Linux
   yum:
     name: "*"
     state: latest
   when: ansible_distribution == "Rocky"
-  notify: install epel-release on RedHat
 
-- name: Update package cache on Ubuntu
+- name: Update all packages on Ubuntu
   apt:
     update_cache: yes
-  when: ansible_os_family == "Debian"
-  notify:
-    - upgrade packages on Ubuntu
+    name: "*"
+    state: latest
+  when: ansible_distribution == "Ubuntu"

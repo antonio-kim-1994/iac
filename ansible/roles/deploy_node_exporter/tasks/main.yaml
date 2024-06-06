@@ -1,0 +1,16 @@
+---
+- name: Pull Node Exporter image
+  community.docker.docker_image_pull:
+    name: prom/node-exporter
+    tag: latest
+
+- name: Run Node Exporter container
+  community.docker.docker_container:
+    image: prom/node-exporter:latest
+    name: node-exporter
+    state: started
+    restart_policy: always
+    ports:
+      - "9100:9100"
+    volumes:
+      - "/:/host:ro,rslave"

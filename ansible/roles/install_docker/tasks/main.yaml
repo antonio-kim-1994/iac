@@ -1,0 +1,7 @@
+---
+- name: Include OS-specific tasks
+  # include_tasks를 사용할 경우 notify 옵션을 사용할 수 없다.
+  # include 된 하위 task에서 notify를 통해 handler를 호출해야 한다.
+  include_tasks: "{{ item }}"
+  with_first_found:
+    - "{{ ansible_os_family }}.yaml"

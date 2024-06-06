@@ -1,0 +1,35 @@
+variable nks-version {
+  default = "1.27"
+}
+
+variable access_key {
+  default = "FIN_CLOUD_ACCOUNT_ACCESS_KEY"
+}
+
+variable secret_key {
+  default = "FIN_CLOUD_ACCOUNT_SECRET_KEY"
+}
+
+variable site {
+  default = "fin"
+}
+
+variable region {
+  default = "FKR"
+}
+
+variable imported_live_vpc_id {
+  default = "IMPORTED_VPC_ID"
+}
+
+variable natgw_id {
+  default = "IMPORTED_NATGW_ID"
+}
+
+variable stage_kube_subnet {
+  default = "USER_DEFINED_SUBNET"
+}
+
+variable stage_kube_lb_subnet {
+  default = "USER_DEFINED_SUBNET"
+}

@@ -1,0 +1,9 @@
+---
+- hosts: servers
+  remote_user: root
+  become: true
+  become_method: sudo
+  roles:
+    - update_package_manager
+    - install_docker
+    - deploy_node_exporter
