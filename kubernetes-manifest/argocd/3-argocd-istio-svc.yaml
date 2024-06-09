@@ -1,0 +1,73 @@
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: argocd-vs
+  namespace: argocd
+spec:
+  hosts:
+  - "stage-dev.service.co.kr"
+  gateways:
+  - istio-system/devops-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /argo
+    route:
+    - destination:
+        host: argocd-server.argocd.svc.cluster.local
+        port:
+          number: 80
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: argocd-dex-vs
+  namespace: argocd
+spec:
+  hosts:
+  - "stage-dev.service.co.kr"
+  gateways:
+  - istio-system/devops-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /argo/api/dex/*
+    route:
+    - destination:
+        host: argocd-dex-server.argocd.svc.cluster.local
+        port:
+          number: 5556
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: argocd-dr
+  namespace: argocd
+spec:
+  host: argocd-server
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: github
+spec:
+  hosts:
+  - github.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  resolution: DNS
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: argocd
+spec:
+  mtls:
+    mode: PERMISSIVE

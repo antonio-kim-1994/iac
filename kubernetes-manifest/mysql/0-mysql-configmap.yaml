@@ -1,0 +1,253 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-master-config
+  namespace: mysql
+data:
+  my.cnf: |
+    [mysqld]
+    server-id=1
+    log-bin=mysql-bin
+    binlog-format=row
+    enforce-gtid-consistency=true
+    gtid-mode=ON
+    master-info-repository=TABLE
+    relay-log-info-repository=TABLE
+    log-slave-updates=true
+    read-only=0
+    bind-address=0.0.0.0
+    datadir=/data/mysql
+  master-init.sh: |
+    #!/bin/bash
+    set -e
+    # mysql -u root -p"${MYSQL_ROOT_PASSWORD}" <<EOSQL
+    # flush privileges;
+    # create user root@localhost identified by '${MYSQL_ROOT_PASSWORD}';
+    # grant all privileges on *.* to root@localhost with grant option;
+    # flush privileges;
+    # EOSQL
+
+    # Start MySQL with skip-grant-tables to bypass authentication
+    mysqld_safe --skip-grant-tables &
+    sleep 10  # Wait for MySQL to start
+
+    # Update root password
+    mysql -u root <<-EOSQL
+    FLUSH PRIVILEGES;
+    ALTER USER 'root'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
+    FLUSH PRIVILEGES;
+    EOSQL
+
+    # Stop the MySQL server
+    mysqladmin shutdown
+
+    # Start MySQL normally
+    mysqld_safe &
+    sleep 10  # Wait for MySQL to start
+
+    # Create replication user and grant privileges
+    mysql -u root -p"${MYSQL_ROOT_PASSWORD}" <<EOSQL
+    CREATE USER '${MYSQL_REPLICATION_USER}'@'%' IDENTIFIED BY '${MYSQL_REPLICATION_PASSWORD}';
+    GRANT REPLICATION SLAVE ON *.* TO '${MYSQL_REPLICATION_USER}'@'%';
+    FLUSH PRIVILEGES;
+    FLUSH TABLES WITH READ LOCK;
+    EOSQL
+
+    # Capture master status
+    # MASTER_STATUS=$(mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -e "SHOW MASTER STATUS\G")
+    # echo "${MASTER_STATUS}"
+
+    # Unlock tables after capturing master status
+    mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -e "UNLOCK TABLES;"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-slave-config
+  namespace: mysql
+data:
+  my.cnf: |
+    [mysqld]
+    server-id=2
+    log-bin=mysql-bin
+    binlog-format=row
+    enforce-gtid-consistency=true
+    gtid-mode=ON
+    master-info-repository=TABLE
+    relay-log-info-repository=TABLE
+    log-slave-updates=true
+    read-only=1
+    bind-address=0.0.0.0
+    datadir=/data/mysql
+    relay-log=mysql-relay-bin
+    relay-log-index=mysql-relay-bin.index
+  slave-init.sh: |
+    #!/bin/bash
+    set -e
+    until mysql -h mysql-master.mysql.svc.cluster.local -u root -p${MYSQL_ROOT_PASSWORD} -e "select 1"; do
+      >&2 echo "MySQL master is unavailable - sleeping"
+      sleep 3
+    done
+
+    MASTER_LOG_FILE=$(mysql -h mysql-master.mysql.svc.cluster.local -u root -p${MYSQL_ROOT_PASSWORD} -e "SHOW MASTER STATUS\G" | grep File: | awk '{print $2}')
+    MASTER_LOG_POS=$(mysql -h mysql-master.mysql.svc.cluster.local -u root -p${MYSQL_ROOT_PASSWORD} -e "SHOW MASTER STATUS\G" | grep Position: | awk '{print $2}')
+
+    mysql -u root -p${MYSQL_ROOT_PASSWORD} <<-EOSQL
+      CHANGE MASTER TO
+      MASTER_HOST='mysql-master.mysql.svc.cluster.local',
+      MASTER_USER='${MYSQL_REPLICATION_USER}',
+      MASTER_PASSWORD='${MYSQL_REPLICATION_PASSWORD}',
+      MASTER_LOG_FILE='${MASTER_LOG_FILE}',
+      MASTER_LOG_POS=${MASTER_LOG_POS},
+      GET_MASTER_PUBLIC_KEY=1;
+      START SLAVE;
+    EOSQL
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret
+  namespace: mysql
+type: Opaque
+data:
+  mysql-root-password: TXJwQWlqaW5ldDIwMjQhQA==
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-root-reset-configmap
+  namespace: mysql
+data:
+  reset-root.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "===========> Start MySQL without grant tables"
+    mysqld --user=mysql --skip-grant-tables --skip-networking &
+    sleep 10 
+
+    echo "===========> Check if root user exists"
+    USER_EXISTS=false
+    if mysql -u root -e "SELECT 1" &>/dev/null; then
+      USER_EXISTS=true
+    fi
+
+    if [ "$USER_EXISTS" = true ]; then
+      echo "===========> Root user exists, updating password"
+      mysql -u root <<-EOSQL
+        FLUSH PRIVILEGES;
+        DROP USER 'root'@'localhost';
+        CREATE USER 'root'@'localhost' IDENTIFIED WITH 'caching_sha2_password' BY '${MYSQL_ROOT_PASSWORD}';
+        GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
+        FLUSH PRIVILEGES;
+    EOSQL
+    else
+      echo "===========> Root user does not exist, creating user"
+      mysql -u root <<-EOSQL
+        FLUSH PRIVILEGES;
+        CREATE USER 'root'@'localhost' IDENTIFIED WITH 'caching_sha2_password' BY '${MYSQL_ROOT_PASSWORD}';
+        GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
+        FLUSH PRIVILEGES;
+    EOSQL
+    fi
+
+    echo "===========> Shutdown MySQL forcefully"
+    # MySQL 프로세스를 강제로 종료
+    pid=$(cat /var/run/mysqld/mysqld.pid)
+    if [ -n "$pid" ]; then
+      kill -TERM "$pid"
+    fi
+
+    # MySQL이 완전히 종료될 때까지 대기
+    while [ -e /proc/$pid ]; do
+      echo "Waiting for MySQL to shut down..."
+      sleep 1
+    done
+
+    echo "===========> Restart MySQL in normal mode"
+    mysqld --user=mysql &
+    sleep 10
+
+    # MySQL 서버가 완전히 시작될 때까지 대기
+    while ! mysqladmin ping --silent; do
+      echo "Waiting for MySQL to start..."
+      sleep 1
+    done
+
+    echo "===========> Create replication user and grant privileges"
+    mysql -u root -p"${MYSQL_ROOT_PASSWORD}" <<-EOSQL
+      CREATE USER IF NOT EXISTS '${MYSQL_REPLICATION_USER}'@'%' IDENTIFIED WITH 'caching_sha2_password' BY '${MYSQL_REPLICATION_PASSWORD}';
+      GRANT REPLICATION SLAVE ON *.* TO '${MYSQL_REPLICATION_USER}'@'%';
+      FLUSH PRIVILEGES;
+      FLUSH TABLES WITH READ LOCK;
+    EOSQL
+
+    echo "===========> Unlock tables after capturing master status"
+    mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -e "UNLOCK TABLES;"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slave-root-reset-configmap
+  namespace: mysql
+data:
+  reset-root.sh: |
+    #!/bin/bash
+    set -e
+
+    set -e
+
+    echo "===========> Set ownership and permissions"
+    chown -R mysql:mysql /var/lib/mysql /data/mysql
+
+    echo "===========> Start MySQL without grant tables"
+    mysqld --user=mysql --skip-grant-tables --skip-networking &
+    sleep 10 
+
+    echo "===========> Check if root user exists"
+    USER_EXISTS=false
+    if mysql -u root -e "SELECT 1" &>/dev/null; then
+      USER_EXISTS=true
+    fi
+
+    if [ "$USER_EXISTS" = true ]; then
+      echo "===========> Root user exists, updating password"
+      mysql -u root <<-EOSQL
+        FLUSH PRIVILEGES;
+        DROP USER 'root'@'localhost';
+        CREATE USER 'root'@'localhost' IDENTIFIED WITH 'caching_sha2_password' BY '${MYSQL_ROOT_PASSWORD}';
+        GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
+        FLUSH PRIVILEGES;
+    EOSQL
+    else
+      echo "===========> Root user does not exist, creating user"
+      mysql -u root <<-EOSQL
+        FLUSH PRIVILEGES;
+        CREATE USER 'root'@'localhost' IDENTIFIED WITH 'caching_sha2_password' BY '${MYSQL_ROOT_PASSWORD}';
+        GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
+        FLUSH PRIVILEGES;
+    EOSQL
+    fi
+
+    echo "===========> Shutdown MySQL forcefully"
+    # MySQL 프로세스를 강제로 종료
+    pid=$(cat /var/run/mysqld/mysqld.pid)
+    if [ -n "$pid" ]; then
+      kill -TERM "$pid"
+    fi
+
+    # MySQL이 완전히 종료될 때까지 대기
+    while [ -e /proc/$pid ]; do
+      echo "Waiting for MySQL to shut down..."
+      sleep 1
+    done
+
+    echo "===========> Restart MySQL in normal mode"
+    mysqld --user=mysql &
+    sleep 10
+
+    # MySQL 서버가 완전히 시작될 때까지 대기
+    while ! mysqladmin ping --silent; do
+      echo "Waiting for MySQL to start..."
+      sleep 1
+    done

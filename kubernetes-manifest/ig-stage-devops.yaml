@@ -1,0 +1,59 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80},{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-certificate-no: "17680"
+    alb.ingress.kubernetes.io/actions.ssl-redirect: |
+      {"type":"redirection","redirection":{"port": "443","protocol":"HTTPS","statusCode":301}}
+    alb.ingress.kubernetes.io/load-balancer-size: small
+    alb.ingress.kubernetes.io/idle-timeout: "60"
+    alb.ingress.kubernetes.io/algorithm-type: round-robin
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/network-type: private
+    alb.ingress.kubernetes.io/enable-access-log: "true"
+    alb.ingress.kubernetes.io/load-balancer-name: stage-devops-alb
+  labels:
+    app: stage-devops-ingress
+  name: stage-devops-ingress
+  namespace: istio-system
+spec:
+  ingressClassName: alb
+  defaultBackend:
+    service:
+      name: istio-ingress
+      port:
+        number: 80
+  rules:      
+  - host: stage-dev.service.co.kr
+    http:
+      paths:
+      - path: /*
+        pathType: Prefix
+        backend:
+          service:
+            name: ssl-redirect
+            port: 
+              name: use-annotation
+      - path: /*
+        pathType: Prefix
+        backend:
+          service:
+            name: istio-ingress
+            port: 
+              number: 80
+      - path: /argo
+        pathType: Prefix
+        backend:
+          service:
+            name: istio-ingress
+            port: 
+              number: 80
+      - path: /manager
+        pathType: Prefix
+        backend:
+          service:
+            name: istio-ingress
+            port: 
+              number: 80

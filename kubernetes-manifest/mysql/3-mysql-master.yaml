@@ -1,0 +1,291 @@
+# apiVersion: apps/v1
+# kind: StatefulSet
+# metadata:
+#   name: mysql-master
+#   namespace: mysql
+#   labels:
+#     app: mysql-master
+# spec:
+#   serviceName: "mysql-master"
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: mysql-master
+#   template:
+#     metadata:
+#       labels:
+#         app: mysql-master
+#     spec:
+#       containers:
+#       - name: mysql
+#         image: mysql:8.0.25
+#         ports:
+#         - containerPort: 3306
+#         volumeMounts:
+#         - name: mysql-persistent-storage
+#           mountPath: /var/lib/mysql
+#         - name: config-volume
+#           mountPath: /etc/mysql/conf.d
+#         - name: init-scripts
+#           mountPath: /docker-entrypoint-initdb.d
+#         - name: nas
+#           mountPath: /dump
+#         - name: restore-scripts
+#           mountPath: /restore
+#         env:
+#         - name: MYSQL_ROOT_PASSWORD
+#           valueFrom:
+#             secretKeyRef:
+#               name: mysql-secret
+#               key: mysql-root-password
+#         - name: MYSQL_REPLICATION_USER
+#           value: "replication_user"
+#         - name: MYSQL_REPLICATION_PASSWORD
+#           valueFrom:
+#             secretKeyRef:
+#               name: mysql-secret
+#               key: mysql-root-password
+#         - name: MYSQL_DATABASE
+#           value: "SAMPLE"
+#         - name: MYSQL_INITDB_SKIP_TZINFO
+#           value: "1"
+#         resources:
+#           requests:
+#             cpu: 3000m
+#             memory: 5Gi
+#       volumes:
+#       - name: config-volume
+#         configMap:
+#           name: mysql-master-config
+#           items:
+#           - key: my.cnf
+#             path: my.cnf
+#       - name: nas
+#         persistentVolumeClaim:
+#           claimName: mysql-pvc
+#       - name: init-scripts
+#         configMap:
+#           name: mysql-master-config
+#           items:
+#           - key: master-init.sh
+#             path: master-init.sh
+#       - name: restore-scripts
+#         configMap:
+#           name: restore-script-config
+#           items:
+#           - key: restore-script.sh
+#             path: restore-script.sh
+#       affinity:
+#         nodeAffinity:
+#           requiredDuringSchedulingIgnoredDuringExecution:
+#             nodeSelectorTerms:
+#             - matchExpressions:
+#               - key: ncloud.com/nks-nodepool
+#                 operator: In
+#                 values:
+#                 - database-nodepool
+#   volumeClaimTemplates:
+#   - metadata:
+#       name: mysql-persistent-storage
+#     spec:
+#       accessModes: [ "ReadWriteOnce" ]
+#       resources:
+#         requests:
+#           storage: 200Gi
+# ---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql-master
+  namespace: mysql
+  labels:
+    app: mysql-master
+spec:
+  serviceName: "mysql-master"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql-master
+  template:
+    metadata:
+      labels:
+        app: mysql-master
+    spec:
+      initContainers:
+      # - name: xtrabackup-init
+      #   image: percona/percona-xtrabackup:latest
+      #   securityContext:
+      #     runAsUser: 0
+      #     runAsGroup: 0
+      #   # Data Restore command
+      #   command:
+      #     - /bin/sh
+      #     - -c
+      #     - |
+      #       # Backup
+      #       CONF=/etc/mysql/conf.d/my.cnf
+
+      #       # Data가 존재하는 경우 삭제
+      #       if [ -d "/data/mysql" ]; then
+      #         echo "Remove /data/mysql dir and Make directory /data/mysql"
+      #         rm -rf /data/mysql && mkdir /data/mysql
+      #       else
+      #         echo "Make directory /data/mysql"
+      #         mkdir /data/mysql
+      #       fi
+
+      #       if [ -d "/data/temp" ]; then
+      #         echo "Remove /data/temp dir and newly make directory."
+      #         rm -rf /data/temp && mkdir /data/temp
+      #       else
+      #         echo "Make directory /data/temp"
+      #         mkdir /data/temp
+      #       fi
+            
+      #       cat /backup/live-mysql-004-1q84_20240521_BACKUP.1716346516 | xbstream -x -C /data/temp
+      #       xtrabackup --defaults-file=${CONF} --prepare --target-dir=/data/temp
+      #       xtrabackup --defaults-file=${CONF} --move-back --target-dir=/data/temp --datadir=/data/mysql
+      #       chown -R mysql:mysql /var/lib/mysql
+      #       chown -R mysql:mysql /data/mysql
+      #   env:
+      #   - name: MYSQL_USER
+      #     value: "root"
+      #   - name: MYSQL_PASSWORD
+      #     valueFrom:
+      #       secretKeyRef:
+      #         name: mysql-secret
+      #         key: mysql-root-password
+      #   volumeMounts:
+      #   - name: backup-storage
+      #     mountPath: /backup
+      #   - name: config-volume
+      #     mountPath: /etc/mysql/conf.d
+      #   - name: mysql-persistent-storage
+      #     mountPath: /var/lib/mysql
+      #   - name: mysql-data-storage
+      #     mountPath: /data
+      #   resources:
+      #     requests:
+      #       cpu: 3000m
+      #       memory: 5Gi
+      - name: init-mysql
+        image: mysql:8.0.25
+        securityContext:
+          runAsUser: 999
+          runAsGroup: 999
+        command:
+          - /bin/bash
+          - /docker-entrypoint-initdb.d/reset-root.sh
+        env:
+        - name: MYSQL_USER
+          value: "root"
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: mysql-root-password
+        - name: MYSQL_REPLICATION_USER
+          value: "replication_user"
+        - name: MYSQL_REPLICATION_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: mysql-root-password
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/mysql/conf.d
+        - name: mysql-persistent-storage
+          mountPath: /var/lib/mysql
+        - name: mysql-data-storage
+          mountPath: /data
+        - name: reset-root-scripts
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          requests:
+            cpu: 3000m
+            memory: 5Gi
+      containers:
+      - name: mysql
+        image: mysql:8.0.25
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+        - name: mysql-persistent-storage
+          mountPath: /var/lib/mysql
+        - name: config-volume
+          mountPath: /etc/mysql/conf.d
+        # - name: init-scripts
+        #   mountPath: /docker-entrypoint-initdb.d
+        - name: mysql-data-storage
+          mountPath: /data
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: mysql-root-password
+        - name: MYSQL_REPLICATION_USER
+          value: "replication_user"
+        - name: MYSQL_REPLICATION_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: mysql-root-password
+        - name: MYSQL_INITDB_SKIP_TZINFO
+          value: "1"
+        resources:
+          requests:
+            cpu: 3000m
+            memory: 5Gi
+      volumes:
+      - name: config-volume
+        configMap:
+          name: mysql-master-config
+          items:
+          - key: my.cnf
+            path: my.cnf
+      - name: backup-storage
+        persistentVolumeClaim:
+          claimName: mysql-pvc
+      # - name: init-scripts
+      #   configMap:
+      #     name: mysql-master-config
+      #     items:
+      #     - key: master-init.sh
+      #       path: master-init.sh
+      - name: reset-root-scripts
+        configMap:
+          name: mysql-root-reset-configmap
+          items:
+          - key: reset-root.sh
+            path: reset-root.sh
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-persistent-storage-mysql-master-0
+      - name: mysql-data-storage
+        persistentVolumeClaim:
+          claimName: mysql-data-storage-mysql-master-0
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: ncloud.com/nks-nodepool
+                operator: In
+                values:
+                - database-nodepool
+  # volumeClaimTemplates:
+  # - metadata:
+  #     name: mysql-data-storage
+  #   spec:
+  #     accessModes: [ "ReadWriteOnce" ]
+  #     resources:
+  #       requests:
+  #         storage: 300Gi
+  # - metadata:
+  #     name: mysql-persistent-storage
+  #   spec:
+  #     accessModes: [ "ReadWriteOnce" ]
+  #     resources:
+  #       requests:
+  #         storage: 50Gi

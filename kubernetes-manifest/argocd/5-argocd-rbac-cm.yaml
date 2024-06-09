@@ -1,0 +1,83 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+  name: argocd-cm
+data:
+  url: https://stage-dev.service.co.kr/argo
+  dex.config: |
+    grpcHost: argocd-dex-server.argocd.svc.cluster.local
+    http: 0.0.0.0:5556
+    connectors:
+      - type: github
+        id: github
+        name: GitHub
+        config:
+          clientID: 460e300138979d632cc5
+          clientSecret: bace567158f437113bd93ec6447e68f3a38667f5
+          #clientSecret: 07f956b34e71f6cf0ee5ce7c7bee709005236d85
+          orgs:
+          - name: Org
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-rbac-cm
+    app.kubernetes.io/part-of: argocd
+  name: argocd-rbac-cm
+data:
+  policy.csv: |
+    p, role:readsync, applications, get, *, allow
+    p, role:readsync, applications, sync, *, allow
+    p, role:readsync, applications, rollback, *, allow
+    p, role:readsync, applications, action/argoproj.io/Rollout/promote-full, */*, allow
+    p, role:readsync, applications, action/argoproj.io/Rollout/restart, */*, allow
+
+    g, Org:DevOps, role:readsync
+    g, Org:BackEnd, role:readsync
+    g, Org:FrontEnd, role:readsync
+    g, Org:Engine, role:readsync
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: api-server-external
+  namespace: argocd
+spec:
+  hosts:
+  - kubernetes.default.svc.cluster.local
+  addresses:
+  - 198.19.128.1
+  endpoints:
+  - address: 198.19.128.1
+  exportTo:
+  - "*"
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: STATIC
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: tls-routing
+  namespace: argocd
+spec:
+  hosts:
+  - 744e1e32-164e-458d-af79-687656d9eff7.fkr.nks.fin-ntruss.com
+  tls:
+  - match:
+    - port: 443
+      sniHosts:
+      - 744e1e32-164e-458d-af79-687656d9eff7.fkr.nks.fin-ntruss.com
+    route:
+    - destination:
+        host: 744e1e32-164e-458d-af79-687656d9eff7.fkr.nks.fin-ntruss.com
