@@ -1,0 +1,3 @@
+[submodule "terramate/modules"]
+	path = terramate/modules
+	url = https://github.com/antonio-kim-1994/iac-common-module.git
