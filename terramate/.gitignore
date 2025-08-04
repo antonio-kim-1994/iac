@@ -1,0 +1,27 @@
+# Terraform 관련 파일/디렉터리 무시
+**/.terraform/modules/*
+**/.terraform/providers/*
+**/*.tfplan
+*.tfstate
+
+# Terramate generate 파일 무시
+**/*_generated.tf
+**/import.tf
+**/import.tm.hcl
+
+# Helm Chart File
+*.tgz
+*Chart.lock
+
+# (선택) terraform plan
+*.plan
+
+# Mac 시스템 파일
+.DS_Store
+
+# IDE 설정 파일 (VSCode, IntelliJ 등)
+.vscode/
+.idea/
+
+# 기타 숨김 파일
+Thumbs.db

@@ -1,0 +1,168 @@
+# This namespace allows you to define where the services are installed into.
+# If not set then they use the namespace of the release.
+namespace: cert-manager
+fullnameOverride: cert-manager
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: nodeType
+              operator: In
+              values:
+                - addon
+
+global:
+  revisionHistoryLimit: 5
+  rbac:
+    # Create required ClusterRoles and ClusterRoleBindings for cert-manager.
+    create: true
+    # Aggregate ClusterRoles to Kubernetes default user-facing roles. For more information, see [User-facing roles](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#user-facing-roles)
+    aggregateClusterRoles: true
+
+  # Set the verbosity of cert-manager. A range of 0 - 6, with 6 being the most verbose.
+  logLevel: 2
+
+  leaderElection:
+    # Override the namespace used for the leader election lease.
+    namespace: "kube-system"
+
+crds:
+  enabled: true
+
+  # This option makes it so that the "helm.sh/resource-policy": keep
+  # annotation is added to the CRD. This will prevent Helm from uninstalling
+  # the CRD when the Helm release is uninstalled.
+  # WARNING: when the CRDs are removed, all cert-manager custom resources
+  # (Certificates, Issuers, ...) will be removed too by the garbage collector.
+  keep: true
+
+replicaCount: 1
+
+
+# The maximum number of challenges that can be scheduled as 'processing' at once.
+maxConcurrentChallenges: 60
+
+image:
+  repository: quay.io/jetstack/cert-manager-controller
+  #    tag:
+
+  # Kubernetes imagePullPolicy on Deployment.
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  # Specifies whether a service account should be created.
+  create: true
+  name: cert-manager
+  annotations: {}
+  labels: {}
+
+# List of signer names that cert-manager will approve by default. CertificateRequests
+# referencing these signer names will be auto-approved by cert-manager. Defaults to just
+# approving the cert-manager.io Issuer and ClusterIssuer issuers.
+approveSignerNames:
+  - issuers.cert-manager.io/*
+  - clusterissuers.cert-manager.io/*
+
+#  extraArgs:
+#    - --controllers=*,-certificaterequests-approver
+extraArgs: [ ]
+
+#  extraEnv:
+#  - name: SOME_VAR
+#    value: 'some value'
+extraEnv: [ ]
+
+resources: { }
+
+
+nodeSelector:
+  kubernetes.io/os: linux
+
+prometheus:
+  # Enable Prometheus monitoring for the cert-manager controller and webhook.
+  enabled: true
+
+webhook:
+  replicaCount: 1
+  # The number of seconds the API server should wait for the webhook to respond before treating the call as a failure.
+  # The value must be between 1 and 30 seconds.
+  timeoutSeconds: 30
+
+  # Additional command line flags to pass to cert-manager webhook binary.
+  extraArgs: [ ]
+  # Path to a file containing a WebhookConfiguration object used to configure the webhook.
+  # - --config=<path-to-config-file>
+
+  extraEnv: [ ]
+
+  resources: { }
+
+  # The nodeSelector on Pods tells Kubernetes to schedule Pods on the nodes with
+  # matching labels.
+  nodeSelector:
+    kubernetes.io/os: linux
+
+  image:
+    repository: quay.io/jetstack/cert-manager-webhook
+    #      tag:
+
+    # Kubernetes imagePullPolicy on Deployment.
+    pullPolicy: IfNotPresent
+
+  serviceAccount:
+    # Specifies whether a service account should be created.
+    create: true
+    name: cert-manager-webhook
+
+cainjector:
+  # Create the CA Injector deployment
+  enabled: true
+  replicaCount: 1
+
+
+  extraArgs: [ ]
+  # - --enable-profiling=true
+
+  extraEnv: [ ]
+
+  resources: { }
+
+  nodeSelector:
+    kubernetes.io/os: linux
+
+  image:
+    repository: quay.io/jetstack/cert-manager-cainjector
+    #      tag:
+
+    pullPolicy: IfNotPresent
+
+  serviceAccount:
+    create: true
+
+    # If not set and create is true, a name is generated using the fullname templates
+    name: cert-manager-cainjector
+
+acmesolver:
+  image:
+    # The container registry to pull the acmesolver image from.
+    # registry: quay.io
+
+    repository: quay.io/jetstack/cert-manager-acmesolver
+
+    # tag: vX.Y.Z
+
+    # Kubernetes imagePullPolicy on Deployment.
+    pullPolicy: IfNotPresent
+
+# This startupapicheck is a Helm post-install hook that waits for the webhook
+# endpoints to become available.
+# The check is implemented using a Kubernetes Job - if you are injecting mesh
+# sidecar proxies into cert-manager pods, ensure that they
+# are not injected into this Job's pod. Otherwise, the installation may time out
+# owing to the Job never being completed because the sidecar proxy does not exit.
+# For more information, see [this note](https://github.com/cert-manager/cert-manager/pull/4414).
+startupapicheck:
+  # Enables the startup api check.
+  enabled: true

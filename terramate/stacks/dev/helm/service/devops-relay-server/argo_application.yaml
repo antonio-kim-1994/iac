@@ -1,0 +1,7 @@
+"argoApplication":
+  "applications":
+    - "name": "devops-relay-server"
+      "namespace": "service"
+  "chart": "helm/service-common"
+  "ecrUrl": "ecr-url"
+  "manifestGitUrl": "https://github.com/sample-org/eks-helm-dev.git"

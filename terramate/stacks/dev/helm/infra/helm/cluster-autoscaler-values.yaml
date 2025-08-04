@@ -1,0 +1,153 @@
+# ============================================================================== #
+# Chart: cluster-autoscaler-autodiscovery
+# https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-autodiscover.yaml
+# ============================================================================== #
+enabled: true
+# cloudProvider -- The cloud provider where the autoscaler runs.
+# Currently only `gce`, `aws`, `azure`, `magnum` and `clusterapi` are supported.
+cloudProvider: aws
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: nodeType
+              operator: In
+              values:
+                - addon
+
+autoDiscovery:
+  # cloudProviders `aws`, `gce`, `azure`, `magnum`, `clusterapi` and `oci` are supported by auto-discovery at this time
+  # AWS: Set tags as described in https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/cloudprovider/aws/README.md#auto-discovery-setup
+
+  # autoDiscovery.clusterName -- Enable autodiscovery for `cloudProvider=aws`, for groups matching `autoDiscovery.tags`.
+  # autoDiscovery.clusterName -- Enable autodiscovery for `cloudProvider=azure`, using tags defined in https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/cloudprovider/azure/README.md#auto-discovery-setup.
+  # Enable autodiscovery for `cloudProvider=clusterapi`, for groups matching `autoDiscovery.labels`.
+  # Enable autodiscovery for `cloudProvider=gce`, but no MIG tagging required.
+  # Enable autodiscovery for `cloudProvider=magnum`, for groups matching `autoDiscovery.roles`.
+  clusterName: service-dev-eks
+
+  # autoDiscovery.namespace -- Enable autodiscovery via cluster namespace for for `cloudProvider=clusterapi`
+  namespace: kube-system
+
+  # autoDiscovery.tags -- ASG tags to match, run through `tpl`.
+  tags:
+    - k8s.io/cluster-autoscaler/enabled
+    - k8s.io/cluster-autoscaler/{{ .Values.autoDiscovery.clusterName }}
+
+  # autoDiscovery.roles -- Magnum node group roles to match.
+  roles:
+    - worker
+
+# awsAccessKeyID -- AWS access key ID ([if AWS user keys used](https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/cloudprovider/aws/README.md#using-aws-credentials))
+awsAccessKeyID: ""
+
+# awsRegion -- AWS region (required if `cloudProvider=aws`)
+awsRegion: ap-northeast-2
+
+# awsSecretAccessKey -- AWS access secret key ([if AWS user keys used](https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/cloudprovider/aws/README.md#using-aws-credentials))
+awsSecretAccessKey: ""
+
+# containerSecurityContext -- [Security context for container](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/)
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+deployment:
+  # deployment.annotations -- Annotations to add to the Deployment object.
+  annotations: { }
+
+# extraArgs -- Additional container arguments.
+# Refer to https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/FAQ.md#what-are-the-parameters-to-ca for the full list of cluster autoscaler
+# parameters and their default values.
+# Everything after the first _ will be ignored allowing the use of multi-string arguments.
+extraArgs:
+  logtostderr: true
+  stderrthreshold: info
+  v: 4
+  expander: least-waste
+  skip-nodes-with-system-pods: true
+  # write-status-configmap: true
+  # status-config-map-name: cluster-autoscaler-status
+  # leader-elect: true
+  # leader-elect-resource-lock: endpoints
+  # skip-nodes-with-local-storage: true
+  # scale-down-enabled: true
+  # balance-similar-node-groups: true
+  # min-replica-count: 0
+  # scale-down-utilization-threshold: 0.5
+  # scale-down-non-empty-candidates-count: 30
+  # max-node-provision-time: 15m0s
+  # scan-interval: 10s
+  # scale-down-delay-after-add: 10m
+  # scale-down-delay-after-delete: 0s
+  # scale-down-delay-after-failure: 3m
+  # scale-down-unneeded-time: 10m
+  # balancing-ignore-label_1: first-label-to-ignore
+  # balancing-ignore-label_2: second-label-to-ignore
+
+# extraVolumeMounts -- Additional volumes to mount.
+extraVolumeMounts:
+  - name: ssl-certs
+    mountPath: /etc/ssl/certs/ca-certificates.crt # /etc/ssl/certs/ca-bundle.crt for Amazon Linux Worker Nodes
+    readOnly: true
+extraVolumes:
+  - name: ssl-certs
+    hostPath:
+      path: "/etc/ssl/certs/ca-bundle.crt"
+
+
+# fullnameOverride -- String to fully override `cluster-autoscaler.fullname` templates.
+fullnameOverride: cluster-autoscaler
+
+image:
+  # image.repository -- Image repository
+  repository: registry.k8s.io/autoscaling/cluster-autoscaler
+  # image.tag -- Image tag
+  tag: v1.31.0
+  # image.pullPolicy -- Image pull policy
+  pullPolicy: IfNotPresent
+  # image.pullSecrets -- Image pull secrets
+  pullSecrets: [ ]
+  # - myRegistrKeySecretName
+
+# podAnnotations -- Annotations to add to each pod.
+podAnnotations:
+  prometheus.io/scrape: 'true'
+  prometheus.io/port: '8085'
+  cluster-autoscaler.kubernetes.io/safe-to-evict: 'false'
+
+# podDisruptionBudget -- Pod disruption budget.
+podDisruptionBudget:
+#    maxUnavailable: 1
+
+# replicaCount -- Desired number of pods
+replicaCount: 1
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 600Mi
+  requests:
+    cpu: 100m
+    memory: 600Mi
+
+# revisionHistoryLimit -- The number of revisions to keep.
+revisionHistoryLimit: 5
+
+# securityContext -- [Security context for pod](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/)
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  fsGroup: 65534
+  seccompProfile:
+    type: RuntimeDefault
+
+service:
+  # service.create -- If `true`, a Service will be created.
+  create: true
+  # service.annotations -- Annotations to add to service

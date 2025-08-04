@@ -1,0 +1,149 @@
+# Official Chart: eks/aws-load-balancer-controller
+# ============================================================================== #
+# Chart: aws-load-balancer-controller
+# Documents: https://github.com/aws/eks-charts/tree/master/stable/aws-load-balancer-controller
+# ============================================================================== #
+aws-load-balancer-controller:
+  enabled: true
+  ##################################################
+  # Deployment Container Arg options
+  ##################################################
+  # The name of the Kubernetes cluster. A non-empty value is required
+  clusterName: service-dev-eks
+
+  # The ingress class this controller will satisfy. If not specified, controller will match all
+  # ingresses without ingress class annotation and ingresses of type alb
+  ingressClass: alb
+
+  # The AWS region for the kubernetes cluster. Set to use KIAM or kube2iam for example.
+  region:
+
+  # The VPC ID for the Kubernetes cluster. Set this manually when your pods are unable to use the metadata service to determine this automatically
+  vpcId:
+
+  ##################################################
+  # Deployment Options
+  ##################################################
+  replicaCount: 1
+  revisionHistoryLimit: 5
+  image:
+    repository: public.ecr.aws/eks/aws-load-balancer-controller
+    tag: v2.9.1
+    pullPolicy: IfNotPresent
+
+  podSecurityContext:
+    fsGroup: 1337 #65534
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 500Mi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+
+  # configureDefaultAffinity specifies whether to configure a default affinity for the controller pods to prevent
+  # co-location on the same node. This will get ignored if you specify a custom affinity configuration.
+  configureDefaultAffinity: false
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: nodeType
+                operator: In
+                values:
+                  - addon
+
+  # Liveness probe configuration for the controller
+  livenessProbe:
+    failureThreshold: 2
+    httpGet:
+      path: /healthz
+      port: 61779
+      scheme: HTTP
+    initialDelaySeconds: 30
+    timeoutSeconds: 10
+
+  # readiness probe configuration for the controller
+  readinessProbe: { }
+
+  env:
+  # ENV_1: ""
+
+  # envFrom:
+  #   - secretRef:
+  #       name: my-secret
+
+  ##################################################
+  # Service Options
+  ##################################################
+  # serviceAnnotations contains annotations to be added to the provisioned webhook service resource
+  serviceAnnotations: { }
+
+  ##################################################
+  # RBAC Options
+  ##################################################
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Annotations to add to the service account
+    annotations: { }
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: aws-load-balancer-controller
+    # Automount API credentials for a Service Account.
+    automountServiceAccountToken: true
+    # List of image pull secrets to add to the Service Account.
+
+  rbac:
+    # Specifies whether rbac resources should be created
+    create: true
+
+  # cluster contains configurations specific to the kubernetes cluster
+  cluster:
+    # Cluster DNS domain (required for requesting TLS certificates)
+    dnsDomain: cluster.local
+
+  ##################################################
+  # Horizontal Pods Autoscaler Options
+  ##################################################
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+
+  ##################################################
+  # ServiceMonitoring Options
+  ##################################################
+  serviceMonitor:
+    # Specifies whether a service monitor should be created
+    enabled: false
+    # Namespace to create the service monitor in
+    namespace:
+
+  ##################################################
+  # Webhook Options
+  ##################################################
+  webhookConfig:
+    # disableIngressValidation disables the validation of resources of kind Ingress, false by default
+    disableIngressValidation:
+
+  # keepTLSSecret specifies whether to reuse existing TLS secret for chart upgrade
+  keepTLSSecret: true
+
+  # Enable cert-manager
+  enableCertManager: true
+
+  ##################################################
+  # Ingress Options
+  ##################################################
+  # ingressClassParams specify the IngressCLassParams that enforce settings for a set of Ingresses when using with ingress Controller.
+  ingressClassParams:
+    create: true
+    # The name of ingressClassParams resource will be referred in ingressClass
+
+  # To use IngressClass resource instead of annotation, before you need to install the IngressClass resource pointing to controller.
+  # If specified as true, the IngressClass resource will be created.
+  createIngressClassResource: true

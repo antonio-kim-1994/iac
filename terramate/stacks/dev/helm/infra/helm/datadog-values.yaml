@@ -1,0 +1,110 @@
+secretStore:
+  name: dev-store
+  region: ap-northeast-2
+  service: SecretsManager
+secretProperties:
+  - secretKey: api-key
+    remoteRef:
+      key: /secret/devops_dev
+      property: DATADOG_API_KEY
+
+datadog:
+  ## Default values for Datadog Agent
+  ## See Datadog helm documentation to learn more:
+  ## https://docs.datadoghq.com/agent/kubernetes/helm/
+
+  ## FOR AN EFFORTLESS UPGRADE PATH, DO NOT COPY THIS FILE AS YOUR OWN values.yaml.
+  ## ONLY SET THE VALUES YOU WANT TO OVERRIDE IN YOUR values.yaml.
+
+  # nameOverride -- Override name of app
+  nameOverride:  # ""
+
+  # fullnameOverride -- Override the full qualified app name
+  fullnameOverride:  # ""
+
+  # targetSystem -- Target OS for this deployment (possible values: linux, windows)
+  targetSystem: "linux"
+
+  # commonLabels -- Labels to apply to all resources
+  commonLabels: { }
+  registry: public.ecr.aws/datadog
+  clusterAgent:
+    enabled: true
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: nodeType
+                  operator: In
+                  values:
+                    - addon
+
+  kube-state-metrics:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: nodeType
+                  operator: In
+                  values:
+                    - addon
+
+  datadog:
+    # datadog.apiKey -- Your Datadog API key
+    ## ref: https://app.datadoghq.com/account/settings#agent/kubernetes
+    # apiKey:
+    apiKeyExistingSecret: datadog-secret
+    # appKey:
+    appKeyExistingSecret: datadog-secret
+
+    apm:
+      hostSocketPath: /var/run/datadog/
+      portEnabled: true
+      socketPath: /var/run/datadog/apm.socket
+
+    clusterChecks:
+      enabled: true
+
+    containerExclude: >-
+      kube_namespace:argocd
+      name:external-dns.*
+      name:cluster-autoscaler.*
+      name:kube-proxy.*
+      name:external-secrets.*
+      name:cluster-agent.*
+      name:k8s.*
+      name:dex.*
+      name:datadog.*
+      name:external-secrets-cert-controller.*
+      name:agent
+      name:istio-proxy*
+      name:istio-init*
+      image:gcr.io/datadoghq/agent
+
+    logs:
+      containerCollectAll: true
+      containerCollectUsingFiles: true
+      enabled: true
+
+    processAgent:
+      enabled: true
+      processCollection: true
+
+    site: datadoghq.com
+
+    systemProbe:
+      collectDNSStats: false
+      enableOOMKill: true
+      enableTCPQueueLength: false
+
+    networkMonitoring:
+      enabled: true
+
+    kubelet:
+      tlsVerify: false
+
+    kubeStateMetricsEnabled: false
+    kubeStateMetricsCore:
+      enabled: true
